@@ -1,0 +1,84 @@
+model:
+  base_learning_rate: 1.0e-04 # Higher LR for diffusion than VAE
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.0015
+    linear_end: 0.0195
+    num_timesteps_cond: 1
+    log_every_t: 200
+    timesteps: 1000
+    first_stage_key: image
+    image_size: 32           # 256px / f8 = 32 latent size
+    channels: 4              # Channels in the latent space (must match embed_dim of VAE)
+    cond_stage_trainable: False
+    concat_mode: False
+    monitor: val/loss
+
+    # UNet Configuration (Operates on Latents)
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        image_size: 32
+        in_channels: 4       # Latent channels
+        out_channels: 4      # Latent channels
+        model_channels: 192
+        attention_resolutions: [ 1, 2, 4, 8 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 2, 4, 4 ]
+        num_head_channels: 32
+
+    # VAE Configuration (Must match Stage 1)
+    first_stage_config:
+      target: ldm.models.autoencoder.AutoencoderKL
+      params:
+        embed_dim: 4
+        # Path to the checkpoint you trained in Step 1
+        ckpt_path: "logs/<your_vae_experiment>/checkpoints/last.ckpt"
+        ddconfig:
+          double_z: True
+          z_channels: 4
+          resolution: 256
+          in_channels: 1     # <--- Must specify 1 channel here too
+          out_ch: 1
+          ch: 128
+          ch_mult: [ 1, 2, 4, 4 ]
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+        lossconfig:
+          target: torch.nn.Identity
+
+    cond_stage_config: "__is_unconditional__"
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 32
+    num_workers: 4
+    wrap: false
+    train:
+      target: ChestXRay.ChestXrayDataset
+      params:
+        root_dir: "../datasets/cleaned"
+        task: "TB"
+        split: "train"
+        img_size: 256
+    validation:
+      target: ChestXRay.ChestXrayDataset
+      params:
+        root_dir: "../datasets/cleaned"
+        task: "TB"
+        split: "val"
+        img_size: 256
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        batch_frequency: 5000
+        max_images: 4
+        increase_log_steps: False
+
+  trainer:
+    benchmark: True
