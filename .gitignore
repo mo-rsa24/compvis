@@ -1,0 +1,11 @@
+# training outputs
+logs/
+**/checkpoints/
+**/*.ckpt
+**/*.pt
+**/*.pth
+**/*.safetensors
+**/*.onnx
+**/*.npz
+**/*.npy
+wandb/
