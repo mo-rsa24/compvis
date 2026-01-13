@@ -1,4 +1,4 @@
-name: ldm
+name: compvis_ldm
 channels:
   - pytorch
   - defaults
