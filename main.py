@@ -626,7 +626,7 @@ if __name__ == "__main__":
         else:
             logger_cfg = OmegaConf.create()
         logger_cfg = OmegaConf.merge(default_logger_cfg, logger_cfg)
-
+        logger_cfg = OmegaConf.to_container(logger_cfg, resolve=True)
         # --- NEW: Override W&B Config with CLI Args ---
         if opt.wandb_project:
             logger_cfg.params.project = opt.wandb_project
