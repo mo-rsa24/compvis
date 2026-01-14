@@ -120,6 +120,9 @@ def get_parser(**parser_kwargs):
         default=True,
         help="scale base-lr by ngpu * batch_size * n_accumulate",
     )
+    parser.add_argument("--wandb_project", type=str, default=None, help="W&B Project Name")
+    parser.add_argument("--wandb_tags", type=str, default=None, help="W&B Tags (comma-separated)")
+    parser.add_argument("--wandb_id", type=str, default=None, help="W&B Run ID (for resuming)")
     return parser
 
 
@@ -556,6 +559,11 @@ if __name__ == "__main__":
                     "save_dir": logdir,
                     "offline": opt.debug,
                     "id": nowname,
+                    "config": {
+                        "git_hash": os.environ.get("GIT_HASH", "unknown"),
+                        "git_branch": os.environ.get("GIT_BRANCH", "unknown"),
+                        "slurm_job_id": os.environ.get("SLURM_JOB_ID", "local"),
+                    }
                 }
             },
             "testtube": {
@@ -572,6 +580,31 @@ if __name__ == "__main__":
         else:
             logger_cfg = OmegaConf.create()
         logger_cfg = OmegaConf.merge(default_logger_cfg, logger_cfg)
+        if "logger" in lightning_config:
+            logger_cfg = lightning_config.logger
+        else:
+            logger_cfg = OmegaConf.create()
+        logger_cfg = OmegaConf.merge(default_logger_cfg, logger_cfg)
+
+        # --- NEW: Override W&B Config with CLI Args ---
+        if opt.wandb_project:
+            logger_cfg.params.project = opt.wandb_project
+        if opt.wandb_id:
+            logger_cfg.params.id = opt.wandb_id
+            logger_cfg.params.version = opt.wandb_id  # 'version' and 'id' are often aliases in PL
+        if opt.wandb_tags:
+            # Parse comma-separated string into a list
+            tags = [t.strip() for t in opt.wandb_tags.split(",") if t.strip()]
+            logger_cfg.params.tags = tags
+
+        # Inject Git Metadata (from previous step)
+        logger_cfg.params.config = logger_cfg.params.get("config", {})
+        logger_cfg.params.config.update({
+            "git_hash": os.environ.get("GIT_HASH", "unknown"),
+            "git_branch": os.environ.get("GIT_BRANCH", "unknown"),
+            "slurm_job_id": os.environ.get("SLURM_JOB_ID", "local"),
+        })
+        # ---------------------------------------------
         trainer_kwargs["logger"] = instantiate_from_config(logger_cfg)
 
         # modelcheckpoint - use TrainResult/EvalResult(checkpoint_on=metric) to
