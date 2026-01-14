@@ -138,7 +138,10 @@ def sanitize_hyperparams(params):
     if OmegaConf.is_config(params):
         return OmegaConf.to_container(params, resolve=True)
     if dataclasses.is_dataclass(params):
-        return dataclasses.asdict(params)
+        return {
+            field.name: sanitize_hyperparams(getattr(params, field.name))
+            for field in dataclasses.fields(params)
+        }
     if isinstance(params, argparse.Namespace):
         return {k: sanitize_hyperparams(v) for k, v in vars(params).items()}
     if isinstance(params, abc.Mapping):
