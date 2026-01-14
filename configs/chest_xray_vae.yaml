@@ -31,14 +31,14 @@ data:
     train:
       target: ChestXRay.ChestXrayDataset  # <--- Your Class
       params:
-        root_dir: "/home/molef/Playground/PhD/datasets/cleaned"   # Update this path
+        root_dir: "/datasets/mmolefe/cleaned"   # Update this path
         task: "All_CXR"
         split: "train"
         img_size: 256
     validation:
       target: ChestXRay.ChestXrayDataset
       params:
-        root_dir: "/home/molef/Playground/PhD/datasets/cleaned"
+        root_dir: "/datasets/mmolefe/cleaned"
         task: "All_CXR"
         split: "val"
         img_size: 256
