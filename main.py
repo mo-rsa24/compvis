@@ -1,4 +1,6 @@
 import argparse, os, sys, datetime, glob, importlib, csv
+import dataclasses
+from collections import abc
 import numpy as np
 import time
 import torch
@@ -131,6 +133,28 @@ def nondefault_trainer_args(opt):
     parser = Trainer.add_argparse_args(parser)
     args = parser.parse_args([])
     return sorted(k for k in vars(args) if getattr(opt, k) != getattr(args, k))
+
+def sanitize_hyperparams(params):
+    if OmegaConf.is_config(params):
+        return OmegaConf.to_container(params, resolve=True)
+    if dataclasses.is_dataclass(params):
+        return dataclasses.asdict(params)
+    if isinstance(params, argparse.Namespace):
+        return {k: sanitize_hyperparams(v) for k, v in vars(params).items()}
+    if isinstance(params, abc.Mapping):
+        return {k: sanitize_hyperparams(v) for k, v in params.items()}
+    if isinstance(params, (list, tuple, set)):
+        return [sanitize_hyperparams(v) for v in params]
+    return params
+
+
+def wrap_wandb_logger(logger):
+    original_log_hyperparams = logger.log_hyperparams
+
+    def log_hyperparams(params, *args, **kwargs):
+        return original_log_hyperparams(sanitize_hyperparams(params), *args, **kwargs)
+
+    logger.log_hyperparams = log_hyperparams
 
 
 class WrappedDataset(Dataset):
@@ -621,6 +645,8 @@ if __name__ == "__main__":
             })
         # ---------------------------------------------
         trainer_kwargs["logger"] = instantiate_from_config(logger_cfg)
+        if isinstance(trainer_kwargs["logger"], pl.loggers.WandbLogger):
+            wrap_wandb_logger(trainer_kwargs["logger"])
 
         # modelcheckpoint - use TrainResult/EvalResult(checkpoint_on=metric) to
         # specify which metric is used to determine best models
