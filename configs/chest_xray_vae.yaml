@@ -47,6 +47,11 @@ data:
         img_size: 256
 
 lightning:
+  logger:
+    target: pytorch_lightning.loggers.WandbLogger
+    params:
+      name: chest-xray-vae
+      save_dir: logs
   callbacks:
     image_logger:
       target: main.ImageLogger
