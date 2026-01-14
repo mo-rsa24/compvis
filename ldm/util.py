@@ -13,6 +13,31 @@ from queue import Queue
 from inspect import isfunction
 from PIL import Image, ImageDraw, ImageFont
 
+def ensure_nchw(x, name="input", channels=(1, 3, 4)):
+    if not isinstance(x, torch.Tensor):
+        raise TypeError(f"{name} must be a torch.Tensor, got {type(x)}")
+    if x.dim() == 3:
+        x = x[..., None]
+    if x.dim() != 4:
+        raise ValueError(f"{name} must be 4D (B,C,H,W or B,H,W,C), got shape {tuple(x.shape)}")
+
+    channels_in_dim1 = x.shape[1] in channels
+    channels_in_last = x.shape[-1] in channels
+
+    if channels_in_dim1 and not channels_in_last:
+        return x
+    if channels_in_last and not channels_in_dim1:
+        return rearrange(x, "b h w c -> b c h w")
+    if channels_in_dim1 and channels_in_last:
+        raise ValueError(
+            f"{name} has ambiguous channel dimension for shape {tuple(x.shape)}; "
+            "expected NCHW or NHWC with a single channel dimension."
+        )
+    raise ValueError(
+        f"{name} channel dimension not found in shape {tuple(x.shape)}; "
+        f"expected channels in {channels}."
+    )
+
 
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)

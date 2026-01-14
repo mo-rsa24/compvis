@@ -18,7 +18,17 @@ from tqdm import tqdm
 from torchvision.utils import make_grid
 from pytorch_lightning.utilities.distributed import rank_zero_only
 
-from ldm.util import log_txt_as_img, exists, default, ismap, isimage, mean_flat, count_params, instantiate_from_config
+from ldm.util import (
+    log_txt_as_img,
+    exists,
+    default,
+    ismap,
+    isimage,
+    mean_flat,
+    count_params,
+    instantiate_from_config,
+    ensure_nchw,
+)
 from ldm.modules.ema import LitEma
 from ldm.modules.distributions.distributions import normal_kl, DiagonalGaussianDistribution
 from ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, AutoencoderKL
@@ -328,9 +338,7 @@ class DDPM(pl.LightningModule):
 
     def get_input(self, batch, k):
         x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        x = rearrange(x, 'b h w c -> b c h w')
+        x = ensure_nchw(x, name=f"batch[{k}]")
         x = x.to(memory_format=torch.contiguous_format).float()
         return x
 

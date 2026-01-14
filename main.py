@@ -299,6 +299,7 @@ class ImageLogger(Callback):
         self.max_images = max_images
         self.logger_log_images = {
             pl.loggers.TestTubeLogger: self._testtube,
+            pl.loggers.WandbLogger: self._wandb,
         }
         self.log_steps = [2 ** n for n in range(int(np.log2(self.batch_freq)) + 1)]
         if not increase_log_steps:
@@ -319,6 +320,19 @@ class ImageLogger(Callback):
             pl_module.logger.experiment.add_image(
                 tag, grid,
                 global_step=pl_module.global_step)
+
+    @rank_zero_only
+    def _wandb(self, pl_module, images, batch_idx, split):
+        import wandb
+
+        for k in images:
+            grid = torchvision.utils.make_grid(images[k])
+            if self.rescale:
+                grid = (grid + 1.0) / 2.0  # -1,1 -> 0,1; c,h,w
+            grid = torch.clamp(grid, 0.0, 1.0)
+            grid = grid.permute(1, 2, 0).cpu().numpy()
+            tag = f"{split}/{k}"
+            pl_module.logger.experiment.log({tag: [wandb.Image(grid)]}, step=pl_module.global_step)
 
     @rank_zero_only
     def log_local(self, save_dir, split, images,

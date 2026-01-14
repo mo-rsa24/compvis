@@ -10,6 +10,7 @@ model:
     first_stage_key: image
     image_size: 32           # 256px / f8 = 32 latent size
     channels: 4              # Channels in the latent space (must match embed_dim of VAE)
+    scale_factor: 0.18215    # SD VAE latent scaling
     cond_stage_trainable: False
     concat_mode: False
     monitor: val/loss
@@ -29,24 +30,12 @@ model:
 
     # VAE Configuration (Must match Stage 1)
     first_stage_config:
-      target: ldm.models.autoencoder.AutoencoderKL
+      target: ldm.models.autoencoder.DiffusersAutoencoderKL
       params:
-        embed_dim: 4
-        # Path to the checkpoint you trained in Step 1
-        ckpt_path: "logs/<your_vae_experiment>/checkpoints/last.ckpt"
-        ddconfig:
-          double_z: True
-          z_channels: 4
-          resolution: 256
-          in_channels: 1     # <--- Must specify 1 channel here too
-          out_ch: 1
-          ch: 128
-          ch_mult: [ 1, 2, 4, 4 ]
-          num_res_blocks: 2
-          attn_resolutions: []
-          dropout: 0.0
-        lossconfig:
-          target: torch.nn.Identity
+        pretrained_model_name_or_path: "stabilityai/sd-vae-ft-mse"
+        expected_channels: 3
+        repeat_channels: false
+
 
     cond_stage_config: "__is_unconditional__"
 
@@ -72,13 +61,19 @@ data:
         img_size: 256
 
 lightning:
+  logger:
+    target: pytorch_lightning.loggers.WandbLogger
+    params:
+      name: chest-xray-ldm
+      save_dir: logs
   callbacks:
     image_logger:
       target: main.ImageLogger
       params:
-        batch_frequency: 5000
+        batch_frequency: 2000
         max_images: 4
         increase_log_steps: False
 
   trainer:
     benchmark: True
+    log_every_n_steps: 50

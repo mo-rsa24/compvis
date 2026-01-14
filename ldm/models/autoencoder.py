@@ -1,14 +1,18 @@
+import numpy as np
 import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
 from contextlib import contextmanager
 
+from torch.optim.lr_scheduler import LambdaLR
+
+from ldm.modules.ema import LitEma
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 
 from ldm.modules.diffusionmodules.model import Encoder, Decoder
 from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 
-from ldm.util import instantiate_from_config
+from ldm.util import ensure_nchw, instantiate_from_config
 
 
 class VQModel(pl.LightningModule):
@@ -343,9 +347,7 @@ class AutoencoderKL(pl.LightningModule):
 
     def get_input(self, batch, k):
         x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        # x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
+        x = ensure_nchw(x, name=f"batch[{k}]")
         x = x.to(memory_format=torch.contiguous_format).float()
         return x
 
@@ -442,3 +444,59 @@ class IdentityFirstStage(torch.nn.Module):
 
     def forward(self, x, *args, **kwargs):
         return x
+
+class DiffusersAutoencoderKL(torch.nn.Module):
+    def __init__(
+        self,
+        pretrained_model_name_or_path,
+        subfolder=None,
+        expected_channels=3,
+        repeat_channels=False,
+        torch_dtype=None,
+    ):
+        super().__init__()
+        from diffusers import AutoencoderKL as DiffusersAutoencoderKL
+
+        self.expected_channels = expected_channels
+        self.repeat_channels = repeat_channels
+        self.model = DiffusersAutoencoderKL.from_pretrained(
+            pretrained_model_name_or_path,
+            subfolder=subfolder,
+            torch_dtype=torch_dtype,
+        )
+
+    def _prepare_input(self, x):
+        x = ensure_nchw(x, name="autoencoder_input")
+        x = x.to(memory_format=torch.contiguous_format).float()
+        if x.shape[1] != self.expected_channels:
+            if self.repeat_channels and x.shape[1] == 1 and self.expected_channels == 3:
+                x = x.repeat(1, 3, 1, 1)
+            else:
+                raise ValueError(
+                    f"Expected {self.expected_channels} channels for autoencoder input, "
+                    f"got {x.shape[1]}."
+                )
+        return x
+
+    def encode(self, x):
+        x = self._prepare_input(x)
+        encoder_output = self.model.encode(x)
+        latent_dist = encoder_output.latent_dist
+        if hasattr(latent_dist, "parameters"):
+            moments = latent_dist.parameters
+        else:
+            moments = torch.cat([latent_dist.mean, latent_dist.logvar], dim=1)
+        return DiagonalGaussianDistribution(moments)
+
+    def decode(self, z):
+        decoded = self.model.decode(z)
+        return decoded.sample
+
+    def forward(self, input, sample_posterior=True):
+        posterior = self.encode(input)
+        if sample_posterior:
+            z = posterior.sample()
+        else:
+            z = posterior.mode()
+        dec = self.decode(z)
+        return dec, posterior
