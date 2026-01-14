@@ -323,7 +323,7 @@ class ImageLogger(Callback):
 
     @rank_zero_only
     def _wandb(self, pl_module, images, batch_idx, split):
-        import wandb
+        import wandb #
 
         for k in images:
             grid = torchvision.utils.make_grid(images[k])
