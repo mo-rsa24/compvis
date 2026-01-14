@@ -75,10 +75,10 @@ class ChestXrayDataset(Dataset):
 
     def __getitem__(self, idx: int):
         p = self.paths[idx]
-        img = Image.open(p).convert("RGB").resize((self.img_size, self.img_size), Image.BICUBIC)
+        img = Image.open(p).convert("L").resize((self.img_size, self.img_size), Image.BICUBIC)
         x = np.asarray(img, dtype=np.float32) / 255.0   # [0,1]
         x = x * 2.0 - 1.0                               # [-1,1]
-        x = x.transpose(2, 0, 1)
+        x = x[None, ...]
         return {
             "image": torch.from_numpy(x),
             "class_label": int(self.labels[idx])

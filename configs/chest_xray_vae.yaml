@@ -10,13 +10,15 @@ model:
         disc_start: 50001
         kl_weight: 0.000001
         disc_weight: 0.5
+        disc_in_channels: 1
+        perceptual_weight: 0.0
 
     ddconfig:
       double_z: True
       z_channels: 4
       resolution: 256
-      in_channels: 3       # <--- Modified for Grayscale
-      out_ch: 3            # <--- Modified for Grayscale
+      in_channels: 1
+      out_ch: 1
       ch: 128
       ch_mult: [ 1, 2, 4, 4 ]  # f = 2^3 = 8 downsampling
       num_res_blocks: 2
@@ -31,14 +33,15 @@ data:
     train:
       target: ChestXRay.ChestXrayDataset  # <--- Your Class
       params:
-        root_dir: "/datasets/mmolefe/cleaned"   # Update this path
+#        root_dir: "/datasets/mmolefe/cleaned"   # Update this path
+        root_dir: "../../Playground/PhD/datasets/cleaned"   # Update this path
         task: "All_CXR"
         split: "train"
         img_size: 256
     validation:
       target: ChestXRay.ChestXrayDataset
       params:
-        root_dir: "/datasets/mmolefe/cleaned"
+        root_dir: "../../Playground/PhD/datasets/cleaned"
         task: "All_CXR"
         split: "val"
         img_size: 256

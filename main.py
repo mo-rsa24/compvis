@@ -612,12 +612,13 @@ if __name__ == "__main__":
             logger_cfg.params.tags = tags
 
         # Inject Git Metadata (from previous step)
-        logger_cfg.params.config = logger_cfg.params.get("config", {})
-        logger_cfg.params.config.update({
-            "git_hash": os.environ.get("GIT_HASH", "unknown"),
-            "git_branch": os.environ.get("GIT_BRANCH", "unknown"),
-            "slurm_job_id": os.environ.get("SLURM_JOB_ID", "local"),
-        })
+        if logger_cfg.get("target") == "pytorch_lightning.loggers.WandbLogger":
+            logger_cfg.params.config = logger_cfg.params.get("config", {})
+            logger_cfg.params.config.update({
+                "git_hash": os.environ.get("GIT_HASH", "unknown"),
+                "git_branch": os.environ.get("GIT_BRANCH", "unknown"),
+                "slurm_job_id": os.environ.get("SLURM_JOB_ID", "local"),
+            })
         # ---------------------------------------------
         trainer_kwargs["logger"] = instantiate_from_config(logger_cfg)
 
